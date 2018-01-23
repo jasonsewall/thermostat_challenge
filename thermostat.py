@@ -96,18 +96,21 @@ class thermostat:
     def tick(self):
         """Using constant ticksize, get exterior temp and exchange heat between climate and building.
            Apply furnace output.
-           Check to see if furnace needs to toggled.
+           Call thermo_state  to see if furnace needs to toggled.
            Advance time."""
         dt = self.ticksize_s
         exterior_temp = self.climate.temp(self.time)
         self.building.extern_flux_tick(exterior_temp, dt)
         furn_output = self.furnace.output(dt)
         self.building.intern_flux_tick(furn_output)
+        self.thermo_state()
+        self.time += dt
+    def thermo_state(self):
+        """The thermostat control. This can look at any part of the system (found in self) and decide to turn the furnace on or off."""
         if False:
             self.furnace.turn_on(self.time)
         else:
             self.furnace.turn_off(self.time)
-        self.time += dt
 
 def run(end_t):
     """Actually run with some dummy parameters"""
@@ -115,6 +118,8 @@ def run(end_t):
     f = furnace(1e4)
     c = climate()
     thermo = thermostat(20, b, f, c)
+    btemp = 0.0
+    nmeasure = 0
     while thermo.time < end_t:
         outside_temp = c.temp(thermo.time)
         thermo.tick()
@@ -122,6 +127,18 @@ def run(end_t):
             furnace_status = "on"
         else:
             furnace_status = "off"
+        btemp += b.temp
+        nmeasure += 1
         print("min: " + str(thermo.time/60.0) + " outside: " + str(outside_temp) + " inside:" +  str(b.temp) + " furnace: " + furnace_status)
     f.turn_off(thermo.time)
+    avg_temp = btemp/nmeasure
+    print("Average building temperature: " + str(avg_temp))
+    # If the building was less than 95% our target temperature, we failed
+    if avg_temp < 20 * 0.95:
+        print("You failed to keep the building warm enough!")
+    else:
+        print("The building was warm enough.")
     print("Used fuel: " + str(f.fuel_burned))
+
+if __name__ == '__main__':
+    run(60*60)
